@@ -1,0 +1,11 @@
+[package]
+name = "tai"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+tai-command = { path = "../crates/tai-command" }
+clap = { version = "4.5.54", features = ["derive"] }
+tokio = { version = "1.49.0", features = ["full"] }

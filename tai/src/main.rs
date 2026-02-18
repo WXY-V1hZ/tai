@@ -1,7 +1,4 @@
-mod ai;
-mod args;
-
-use args::Cli;
+use tai_command::Cli;
 use clap::Parser;
 use std::error::Error;
 
