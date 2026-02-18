@@ -1,17 +1,20 @@
+mod ask;
 mod config;
-mod do_ask;
+mod r#do;
 mod go;
 mod init;
 mod model;
 
+pub use ask::AskArgs;
 pub use config::ConfigCommand;
-pub use do_ask::DoAskArgs;
+pub use r#do::DoArgs;
 pub use go::GoArgs;
 pub use init::InitCommand;
 pub use model::ModelArgs;
 
 use clap::{Parser, Subcommand};
-use std::error::Error;
+use tai_core::TaiResult;
+use tracing::debug;
 
 #[derive(Parser, Debug)]
 #[command(name = "tai", version)]
@@ -24,11 +27,12 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub async fn handle(self) -> Result<(), Box<dyn Error>> {
+    pub async fn handle(self) -> TaiResult<()> {
         match self.command {
             Some(command) => command.handle().await,
             None => {
                 let path = self.dir_path.unwrap_or_else(|| ".".to_string());
+                debug!("打开目录: {}", path);
                 println!("open directory: {}", path);
                 Ok(())
             }
@@ -39,19 +43,19 @@ impl Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     Model(ModelArgs),
-    Do(DoAskArgs),
-    Ask(DoAskArgs),
+    Do(DoArgs),
+    Ask(AskArgs),
     Go(GoArgs),
     Init,
     Config,
 }
 
 impl Commands {
-    pub async fn handle(self) -> Result<(), Box<dyn Error>> {
+    pub async fn handle(self) -> TaiResult<()> {
         match self {
             Commands::Model(args) => args.handle().await,
-            Commands::Do(args) => args.handle("do").await,
-            Commands::Ask(args) => args.handle("ask").await,
+            Commands::Do(args) => args.handle().await,
+            Commands::Ask(args) => args.handle().await,
             Commands::Go(args) => args.handle().await,
             Commands::Init => InitCommand.handle().await,
             Commands::Config => ConfigCommand.handle().await,

@@ -1,6 +1,8 @@
 use dirs_next::home_dir;
 use serde::{Deserialize, Serialize};
-use std::{error::Error, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
+use tai_core::{TaiError, TaiResult};
+use tracing::{debug, error, warn};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProviderConfig {
@@ -31,28 +33,62 @@ fn state_path() -> PathBuf {
     tai_dir().join("state.json")
 }
 
-pub fn load_providers() -> Result<Vec<ProviderConfig>, Box<dyn Error>> {
+pub fn load_providers() -> TaiResult<Vec<ProviderConfig>> {
     let path = providers_path();
+    debug!("加载 provider 配置: {:?}", path);
+    
     if !path.exists() {
+        warn!("Provider 配置文件不存在: {:?}", path);
         return Ok(Vec::new());
     }
-    let content = fs::read_to_string(path)?;
-    Ok(serde_json::from_str(&content)?)
+    
+    let content = fs::read_to_string(&path).map_err(|e| {
+        error!("读取 provider 配置失败: {}", e);
+        TaiError::FileError(format!("无法读取 {:?}: {}", path, e))
+    })?;
+    
+    let providers: Vec<ProviderConfig> = serde_json::from_str(&content)?;
+    debug!("成功加载 {} 个 provider 配置", providers.len());
+    
+    Ok(providers)
 }
 
-pub fn load_active_model() -> Result<Option<ActiveModel>, Box<dyn Error>> {
+pub fn load_active_model() -> TaiResult<Option<ActiveModel>> {
     let path = state_path();
+    debug!("加载激活模型状态: {:?}", path);
+    
     if !path.exists() {
+        debug!("状态文件不存在，使用默认模型");
         return Ok(None);
     }
-    let content = fs::read_to_string(path)?;
-    Ok(Some(serde_json::from_str(&content)?))
+    
+    let content = fs::read_to_string(&path).map_err(|e| {
+        error!("读取状态文件失败: {}", e);
+        TaiError::FileError(format!("无法读取 {:?}: {}", path, e))
+    })?;
+    
+    let active: ActiveModel = serde_json::from_str(&content)?;
+    debug!("加载激活模型: {}/{}", active.provider, active.model);
+    
+    Ok(Some(active))
 }
 
-pub fn save_active_model(active: &ActiveModel) -> Result<(), Box<dyn Error>> {
+pub fn save_active_model(active: &ActiveModel) -> TaiResult<()> {
     let path = state_path();
-    fs::create_dir_all(path.parent().unwrap())?;
-    fs::write(path, serde_json::to_string_pretty(active)?)?;
+    debug!("保存激活模型: {}/{} 到 {:?}", active.provider, active.model, path);
+    
+    fs::create_dir_all(path.parent().unwrap()).map_err(|e| {
+        error!("创建目录失败: {}", e);
+        TaiError::FileError(format!("无法创建目录: {}", e))
+    })?;
+    
+    let content = serde_json::to_string_pretty(active)?;
+    fs::write(&path, content).map_err(|e| {
+        error!("写入状态文件失败: {}", e);
+        TaiError::FileError(format!("无法写入 {:?}: {}", path, e))
+    })?;
+    
+    debug!("成功保存激活模型: {}/{}", active.provider, active.model);
     Ok(())
 }
 
@@ -73,11 +109,21 @@ pub fn resolve_active<'a>(
                     .map(|m| (p, m.as_str()))
             });
         if found.is_some() {
+            debug!("使用配置的激活模型: {}/{}", a.provider, a.model);
             return found;
+        } else {
+            warn!("配置的激活模型 {}/{} 不存在，使用回退", a.provider, a.model);
         }
     }
+    
     // 回退：第一个 provider 的第一个 model
-    providers
+    let fallback = providers
         .first()
-        .and_then(|p| p.model_names.first().map(|m| (p, m.as_str())))
+        .and_then(|p| p.model_names.first().map(|m| (p, m.as_str())));
+    
+    if let Some((p, m)) = fallback {
+        debug!("使用回退模型: {}/{}", p.provider, m);
+    }
+    
+    fallback
 }

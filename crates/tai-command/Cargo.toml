@@ -5,10 +5,12 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+tai-ai = { path = "../tai-ai" }
+tai-core = { path = "../tai-core" }
+tai-tui = { path = "../tai-tui" }
 arboard = "3.4.1"
 clap = { version = "4.5.54", features = ["derive"] }
 dirs-next = "2"
 encoding_rs = "0.8"
-tai-ai = { path = "../tai-ai" }
-tai-tui = { path = "../tai-tui" }
 tokio = { version = "1.49.0", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"

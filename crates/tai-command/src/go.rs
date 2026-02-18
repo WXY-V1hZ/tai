@@ -1,8 +1,9 @@
 use arboard::Clipboard;
 use clap::Args;
-use tai_tui::Spinner;
-use std::{error::Error};
 use tai_ai::{chat, load_active_model, load_providers, resolve_active};
+use tai_core::{TaiError, TaiResult};
+use tai_tui::Spinner;
+use tracing::{debug, warn};
 
 const PROMPT: &str = "\
 你是一名命令行助手，请严格遵循以下规则：
@@ -44,14 +45,17 @@ pub struct GoArgs {
 }
 
 impl GoArgs {
-    pub async fn handle(self) -> Result<(), Box<dyn Error>> {
+    pub async fn handle(self) -> TaiResult<()> {
+        debug!("Go 命令: 用户输入 = {}", self.user_input);
+        
         let providers = load_providers()?;
         if providers.is_empty() {
-            return Err("未找到 provider 配置，请检查 ~/.tai/providers.json".into());
+            return Err(TaiError::NoProviderConfig);
         }
+        
         let active = load_active_model()?;
         let (provider, model) = resolve_active(&providers, active.as_ref())
-            .ok_or("没有可用的模型")?;
+            .ok_or(TaiError::NoActiveModel)?;
 
         let prompt = format!("{} {}", PROMPT, self.user_input);
 
@@ -64,14 +68,20 @@ impl GoArgs {
         match Clipboard::new() {
             Ok(mut clipboard) => {
                 if let Err(e) = clipboard.set_text(&command) {
+                    warn!("无法复制到剪贴板: {}", e);
                     eprintln!("警告: 无法复制到剪贴板: {}", e);
                 } else {
+                    debug!("命令已复制到剪贴板");
                     println!("✓ 已复制到剪贴板");
                 }
             }
-            Err(e) => eprintln!("警告: 无法访问剪贴板: {}", e),
+            Err(e) => {
+                warn!("无法访问剪贴板: {}", e);
+                eprintln!("警告: 无法访问剪贴板: {}", e);
+            }
         }
 
+        debug!("Go 命令完成");
         Ok(())
     }
 }
