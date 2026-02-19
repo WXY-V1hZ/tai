@@ -1,12 +1,14 @@
 use clap::Args;
 use tai_ai::{load_active_model, load_providers, resolve_active, save_active_model, ActiveModel};
 use tai_core::{TaiError, TaiResult};
+use tai_tui::{select_model, ModelItem};
 use tracing::debug;
 
 #[derive(Args, Debug)]
 pub struct ModelArgs {
-    /// model name to switch (e.g. deepseek-chat, gpt-4o-mini)
-    pub model_name: Option<String>,
+    /// 直接切换到指定模型（不触发 TUI）
+    #[arg(short = 's', long = "switch")]
+    pub switch: Option<String>,
 }
 
 impl ModelArgs {
@@ -17,43 +19,72 @@ impl ModelArgs {
             return Ok(());
         }
 
-        match self.model_name {
-            Some(model_name) => {
-                debug!("尝试切换到模型: {}", model_name);
-                
-                // 切换模型
-                for provider in &providers {
-                    if let Some(model) = provider.model_names.iter().find(|m| *m == &model_name) {
-                        save_active_model(&ActiveModel {
-                            provider: provider.provider.clone(),
-                            model: model.clone(),
-                        })?;
-                        println!("已切换到 {}/{}", provider.provider, model);
-                        debug!("模型切换成功: {}/{}", provider.provider, model);
-                        return Ok(());
-                    }
-                }
-                
-                Err(TaiError::ModelNotFound(model_name))
-            }
-            None => {
-                debug!("列出所有可用模型");
-                
-                // 列出所有模型
-                let active = load_active_model()?;
-                let current = resolve_active(&providers, active.as_ref());
+        if let Some(model_name) = self.switch {
+            return switch_model(&providers, &model_name);
+        }
 
-                for provider in &providers {
-                    for model in &provider.model_names {
-                        let is_active = current
-                            .map(|(p, m)| p.provider == provider.provider && m == model.as_str())
-                            .unwrap_or(false);
-                        let marker = if is_active { "*" } else { " " };
-                        println!("{} {}/{}", marker, provider.provider, model);
-                    }
-                }
-                Ok(())
+        // 无参数：触发交互式 TUI 列表
+        let active = load_active_model()?;
+        let current = resolve_active(&providers, active.as_ref());
+
+        let items: Vec<ModelItem> = providers
+            .iter()
+            .flat_map(|p| {
+                p.model_names
+                    .iter()
+                    .map(|m| ModelItem::new(&p.provider, m))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+
+        let current_index = current
+            .and_then(|(cp, cm)| {
+                items
+                    .iter()
+                    .position(|item| item.provider == cp.provider && item.model == cm)
+            })
+            .unwrap_or(0);
+
+        debug!("打开交互式模型选择器，当前模型索引: {}", current_index);
+
+        match select_model(&items, current_index) {
+            Ok(Some(index)) => {
+                let item = &items[index];
+                let provider = providers
+                    .iter()
+                    .find(|p| p.provider == item.provider)
+                    .unwrap();
+                save_active_model(&ActiveModel {
+                    provider: provider.provider.clone(),
+                    model: item.model.clone(),
+                })?;
+                debug!("已切换到模型: {}/{}", provider.provider, item.model);
+                println!("已切换到 {}/{}", provider.provider, item.model);
+            }
+            Ok(None) => {
+                debug!("用户取消了模型选择");
+            }
+            Err(e) => {
+                return Err(TaiError::AiError(format!("TUI 错误: {}", e)));
             }
         }
+
+        Ok(())
     }
+}
+
+fn switch_model(providers: &[tai_ai::ProviderConfig], model_name: &str) -> TaiResult<()> {
+    debug!("尝试切换到模型: {}", model_name);
+    for provider in providers {
+        if let Some(model) = provider.model_names.iter().find(|m| *m == model_name) {
+            save_active_model(&ActiveModel {
+                provider: provider.provider.clone(),
+                model: model.clone(),
+            })?;
+            debug!("已切换到模型: {}/{}", provider.provider, model);
+            println!("已切换到 {}/{}", provider.provider, model);
+            return Ok(());
+        }
+    }
+    Err(TaiError::ModelNotFound(model_name.to_string()))
 }
