@@ -22,7 +22,7 @@ tai go "list all rust files"
 # Generates and copies to clipboard: ls **/*.rs
 ```
 
-![tai-go-demo](website/assetstai-go-demo.gif)
+![tai-go-demo](website/assets/tai-go-demo.gif)
 
 ### 🤖 AI Conversation (`tai ask`)
 
@@ -32,7 +32,7 @@ Stream responses from AI models directly in your terminal, with real-time reason
 tai ask "Explain Rust's ownership system"
 ```
 
-![reasoning-demo](website/assetsreasoning-demo.gif)
+![reasoning-demo](website/assets/reasoning-demo.gif)
 
 **Features:**
 - **Streaming output**: See the AI's response as it's generated
@@ -71,7 +71,7 @@ tai model
 tai model gpt-4o-mini
 ```
 
-![model-selector-demo](website/assetsmodel-selector-demo.gif)
+![model-selector-demo](website/assets/model-selector-demo.gif)
 
 Supported providers:
 - **OpenAI**: GPT-4o, GPT-4o-mini
@@ -181,7 +181,7 @@ Use arrow keys to navigate, Enter to select, `q` to quit.
 
 After streaming completes, press any key to enter the scrollable viewer:
 
-![scrollable-viewer](website/assetsscrollable-viewer.gif)
+![scrollable-viewer](website/assets/scrollable-viewer.gif)
 
 **Controls:**
 - `↑/k` - Scroll up
