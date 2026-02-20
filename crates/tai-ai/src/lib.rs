@@ -19,9 +19,9 @@ use tai_core::{TaiError, TaiResult};
 use tokio::time::{sleep, Duration};
 use tracing::{debug, error, warn};
 
-const IS_TEST: bool = false;
+const IS_TEST: bool = true;
 const TEST_FILE: &str = "D:/program/proj/tai/test_response.md";
-const TEST_DELAY_MS: u64 = 0;
+const TEST_DELAY_MS: u64 = 50;
 
 #[derive(Debug, Clone)]
 pub enum StreamChunk {
