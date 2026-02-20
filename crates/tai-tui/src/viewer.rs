@@ -63,11 +63,14 @@ fn run_view_loop(w: &mut impl Write, view: &mut MadView) -> io::Result<()> {
                     break;
                 }
                 match code {
+                    KeyCode::Char('k') => view.try_scroll_lines(-1),
                     KeyCode::Up => view.try_scroll_lines(-1),
+                    KeyCode::Char('j') => view.try_scroll_lines(1),
                     KeyCode::Down => view.try_scroll_lines(1),
                     KeyCode::PageUp => view.try_scroll_pages(-1),
                     KeyCode::PageDown => view.try_scroll_pages(1),
-                    _ => break,
+                    KeyCode::Char('q') | KeyCode::Esc => break,
+                    _ => {}
                 }
             }
             Ok(Event::Key(_)) => {}
