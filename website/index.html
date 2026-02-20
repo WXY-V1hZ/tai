@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tai (态) - AI 驱动的命令行助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#10b981',
+                        dark: '#0f172a',
+                        darker: '#020617',
+                        accent: '#8b5cf6'
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #020617;
+            color: #e2e8f0;
+        }
+        .gradient-text {
+            background: linear-gradient(to right, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .code-block {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 bg-darker/80 backdrop-blur-md border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-2xl font-bold gradient-text">Tai (态)</span>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-8">
+                        <a href="#features" class="hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium">功能</a>
+                        <a href="#installation" class="hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium">安装</a>
+                        <a href="#configuration" class="hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium">配置</a>
+                        <a href="https://github.com/yourusername/tai" target="_blank" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors">GitHub</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div class="text-center">
+            <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-8">
+                AI 驱动的 <br/>
+                <span class="gradient-text">命令行助手</span>
+            </h1>
+            <p class="mt-4 max-w-2xl mx-auto text-xl text-gray-400 mb-10">
+                支持流式输出、Markdown 渲染和多厂商模型的 Rust CLI 工具。<br/>
+                将对话式 AI 带到你的终端。
+            </p>
+            <div class="flex justify-center gap-4 mb-16">
+                <a href="#installation" class="px-8 py-3 bg-primary hover:bg-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-blue-500/30">
+                    快速开始
+                </a>
+                <a href="https://github.com/yourusername/tai" target="_blank" class="px-8 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg border border-gray-700 transition-all">
+                    查看源码
+                </a>
+            </div>
+            
+            <div class="relative rounded-xl overflow-hidden shadow-2xl border border-white/10 max-w-4xl mx-auto">
+                <div class="absolute top-0 left-0 right-0 h-8 bg-gray-900 flex items-center px-4 space-x-2 border-b border-gray-800">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                </div>
+                <img src="assets/reasoning-demo.gif" alt="Tai Reasoning Demo" class="w-full pt-8 bg-gray-900">
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 bg-darker">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-white mb-4">核心功能</h2>
+                <p class="text-gray-400">专为开发者打造的高效工具</p>
+            </div>
+
+            <!-- Feature 1: Command Generation -->
+            <div class="grid md:grid-cols-2 gap-12 items-center mb-24">
+                <div>
+                    <div class="inline-block p-2 bg-yellow-500/10 rounded-lg mb-4">
+                        <span class="text-2xl">⚡</span>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">自然语言转命令</h3>
+                    <p class="text-gray-400 mb-6">
+                        不再需要记住复杂的 grep 或 find 参数。只需描述你想要做什么，Tai 就会为你生成命令。
+                    </p>
+                    <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm border border-gray-800">
+                        <div class="text-green-400">$ tai go "列出所有 rust 文件"</div>
+                        <div class="text-gray-500 mt-2"># 生成并复制到剪贴板: ls **/*.rs</div>
+                    </div>
+                </div>
+                <div class="rounded-xl overflow-hidden shadow-xl border border-white/10">
+                    <img src="assets/tai-go-demo.gif" alt="Command Generation Demo" class="w-full">
+                </div>
+            </div>
+
+            <!-- Feature 2: History & Scrollable View -->
+            <div class="grid md:grid-cols-2 gap-12 items-center mb-24">
+                <div class="order-2 md:order-1 rounded-xl overflow-hidden shadow-xl border border-white/10">
+                    <img src="assets/scrollable-viewer.gif" alt="Scrollable Viewer Demo" class="w-full">
+                </div>
+                <div class="order-1 md:order-2">
+                    <div class="inline-block p-2 bg-blue-500/10 rounded-lg mb-4">
+                        <span class="text-2xl">📜</span>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">智能历史记录与查看器</h3>
+                    <p class="text-gray-400 mb-6">
+                        自动保存每次对话，随时回顾。内置交互式查看器，支持 Markdown 渲染、代码高亮和长内容滚动。
+                    </p>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            自动保存最近 50 条记录
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            方向键交互式选择
+                        </li>
+                        <li class="flex items-center">
+                            <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            原生 Markdown 渲染支持
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Feature 3: Model Management -->
+            <div class="grid md:grid-cols-2 gap-12 items-center">
+                <div>
+                    <div class="inline-block p-2 bg-purple-500/10 rounded-lg mb-4">
+                        <span class="text-2xl">🎛️</span>
+                    </div>
+                    <h3 class="text-2xl font-bold mb-4">多模型管理</h3>
+                    <p class="text-gray-400 mb-6">
+                        轻松在不同 AI 模型和厂商间切换。支持 OpenAI、DeepSeek 等主流厂商，也可通过 API 兼容性支持自定义厂商。
+                    </p>
+                    <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm border border-gray-800">
+                        <div class="text-green-400">$ tai model</div>
+                        <div class="text-gray-500 mt-1"># 交互式选择模型</div>
+                        <div class="text-green-400 mt-3">$ tai model gpt-4o-mini</div>
+                        <div class="text-gray-500 mt-1"># 快速切换</div>
+                    </div>
+                </div>
+                <div class="rounded-xl overflow-hidden shadow-xl border border-white/10">
+                    <img src="assets/model-selector-demo.gif" alt="Model Selector Demo" class="w-full">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section id="installation" class="py-20 bg-dark">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-white mb-4">安装指南</h2>
+                <p class="text-gray-400">开始使用 Tai 提升你的终端体验</p>
+            </div>
+
+            <div class="bg-gray-900 rounded-xl p-8 border border-white/10 shadow-2xl">
+                <h3 class="text-xl font-bold text-white mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    从源码编译
+                </h3>
+                <div class="relative group">
+                    <pre class="font-mono text-sm text-gray-300 bg-black/50 p-4 rounded-lg overflow-x-auto">
+git clone https://github.com/yourusername/tai.git
+cd tai
+cargo build --release</pre>
+                </div>
+                <p class="mt-4 text-sm text-gray-500">
+                    编译完成后，可执行文件位于 <code class="bg-gray-800 px-1 rounded text-gray-300">target/release/tai</code>。
+                </p>
+
+                <div class="mt-8 border-t border-gray-800 pt-6">
+                    <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">系统要求</h4>
+                    <ul class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-gray-300">
+                        <li class="flex items-center">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                            Rust 1.93+
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                            Windows 10+ / macOS / Linux
+                        </li>
+                        <li class="flex items-center">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                            支持 ANSI 颜色的终端
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Configuration Section -->
+    <section id="configuration" class="py-20 bg-darker">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-white mb-4">快速配置</h2>
+                <p class="text-gray-400">设置 API 密钥以启用 AI 功能</p>
+            </div>
+
+            <div class="prose prose-invert max-w-none">
+                <p class="text-gray-400 mb-4">在 <code class="text-primary">~/.tai/providers.json</code> 中添加以下内容：</p>
+                <div class="bg-gray-900 rounded-xl p-6 border border-white/10 font-mono text-sm overflow-x-auto">
+<pre class="text-gray-300">
+[
+  {
+    <span class="text-purple-400">"provider"</span>: <span class="text-green-400">"openai"</span>,
+    <span class="text-purple-400">"base_url"</span>: <span class="text-green-400">"https://api.openai.com/v1"</span>,
+    <span class="text-purple-400">"api_key"</span>: <span class="text-green-400">"sk-your-api-key-here"</span>,
+    <span class="text-purple-400">"model_names"</span>: [<span class="text-green-400">"gpt-4o-mini"</span>, <span class="text-green-400">"gpt-4o"</span>]
+  },
+  {
+    <span class="text-purple-400">"provider"</span>: <span class="text-green-400">"deepseek"</span>,
+    <span class="text-purple-400">"base_url"</span>: <span class="text-green-400">"https://api.deepseek.com"</span>,
+    <span class="text-purple-400">"api_key"</span>: <span class="text-green-400">"sk-your-api-key-here"</span>,
+    <span class="text-purple-400">"model_names"</span>: [<span class="text-green-400">"deepseek-chat"</span>, <span class="text-green-400">"deepseek-reasoner"</span>]
+  }
+]
+</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-black py-12 border-t border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <span class="text-2xl font-bold text-white">Tai</span>
+                    <p class="text-gray-500 text-sm mt-1">AI 驱动的下一代命令行体验</p>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="https://github.com/yourusername/tai" class="text-gray-400 hover:text-white transition-colors">
+                        <span class="sr-only">GitHub</span>
+                        <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
+                    </a>
+                </div>
+            </div>
+            <div class="mt-8 pt-8 border-t border-gray-800 text-center text-sm text-gray-600">
+                &copy; 2026 Tai Project. MIT License.
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>

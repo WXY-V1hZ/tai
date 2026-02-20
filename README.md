@@ -11,8 +11,6 @@ Tai 是一个基于 Rust 的 CLI 工具，将对话式 AI 带到你的终端，�
 - 多厂商支持（OpenAI、DeepSeek 等）
 - 快速高效，零活动循环
 
-![tai-ask-demo](doc/tai-ask-demo.gif)
-
 ## 核心功能
 
 ### ⚡ 命令生成 (`tai go`)
@@ -24,7 +22,7 @@ tai go "列出所有 rust 文件"
 # 生成并复制到剪贴板: ls **/*.rs
 ```
 
-![tai-go-demo](doc/tai-go-demo.gif)
+![tai-go-demo](website/assetstai-go-demo.gif)
 
 ### 🤖 AI 对话 (`tai ask`)
 
@@ -34,7 +32,7 @@ tai go "列出所有 rust 文件"
 tai ask "解释 Rust 的所有权系统"
 ```
 
-![reasoning-demo](doc/reasoning-demo.gif)
+![reasoning-demo](website/assetsreasoning-demo.gif)
 
 **特性：**
 - **流式输出**：实时查看 AI 的回答生成过程
@@ -73,7 +71,7 @@ tai model
 tai model gpt-4o-mini
 ```
 
-![model-selector-demo](doc/model-selector-demo.gif)
+![model-selector-demo](website/assetsmodel-selector-demo.gif)
 
 支持的厂商：
 - **OpenAI**：GPT-4o, GPT-4o-mini
@@ -183,7 +181,7 @@ tai ask -c 10
 
 流式输出完成后，按任意键进入可滚动查看器：
 
-![scrollable-viewer](doc/scrollable-viewer.gif)
+![scrollable-viewer](website/assetsscrollable-viewer.gif)
 
 **控制键：**
 - `↑/k` - 向上滚动

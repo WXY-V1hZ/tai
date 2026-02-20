@@ -19,7 +19,7 @@ use tai_core::{TaiError, TaiResult};
 use tokio::time::{sleep, Duration};
 use tracing::{debug, error, warn};
 
-const IS_TEST: bool = true;
+const IS_TEST: bool = false;
 const TEST_FILE: &str = "D:/program/proj/tai/assets/test_response.md";
 const TEST_REASONING_FILE: &str = "D:/program/proj/tai/assets/test_reasoning.md";
 const TEST_DELAY_MS: u64 = 50;
