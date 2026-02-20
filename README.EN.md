@@ -76,6 +76,8 @@ tai go "list all rust files"
 # Generates and copies to clipboard: ls **/*.rs
 ```
 
+![tai-go-demo](doc/tai-go-demo.gif)
+
 ### 🔧 System Info (`tai init`)
 
 Collect system information for AI context:
