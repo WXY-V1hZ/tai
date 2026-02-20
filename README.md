@@ -21,7 +21,7 @@ Stream responses from AI models directly in your terminal, with real-time reason
 tai ask "Explain Rust's ownership system"
 ```
 
-![reasoning-demo](doc/reasoning-demo.mp4)
+![reasoning-demo](doc/reasoning-demo.gif)
 
 **Features:**
 - **Streaming output**: See the AI's response as it's generated

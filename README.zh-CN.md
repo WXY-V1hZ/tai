@@ -11,7 +11,7 @@ Tai 是一个基于 Rust 的 CLI 工具，将对话式 AI 带到你的终端，�
 - 多厂商支持（OpenAI、DeepSeek 等）
 - 快速高效，零活动循环
 
-![tai-ask-demo](doc/tai-ask-demo.mp4)
+![tai-ask-demo](doc/tai-ask-demo.gif)
 
 ## 核心功能
 
