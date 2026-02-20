@@ -5,33 +5,31 @@ use termimad::{
         style::{Color, Print, ResetColor, SetForegroundColor},
         QueueableCommand,
     },
-    MadSkin,
 };
 
-/// 流式渲染器：reasoning 增量输出灰色文本，answer 收集后由 termimad 一次性渲染 Markdown
-pub struct ReasoningDisplay {
-    reasoning_buffer: String,
-    answer_buffer: String,
-    /// reasoning 已输出的字节数（用于增量追加）
-    reasoning_rendered_bytes: usize,
-    skin: MadSkin,
+use crate::viewer::{show_markdown_view, make_default_skin};
+
+fn make_answer_skin() -> termimad::MadSkin {
+    make_default_skin()
 }
 
-impl ReasoningDisplay {
-    pub fn new() -> Self {
-        let mut skin = MadSkin::default();
-        skin.set_headers_fg(Color::Cyan);
-        skin.bold.set_fg(Color::Yellow);
-        skin.italic.set_fg(Color::Magenta);
-        skin.code_block.set_fgbg(Color::White, Color::DarkGrey);
-        skin.inline_code.set_fg(Color::Green);
-        skin.table.set_fg(Color::Cyan);
+/// 流式渲染器
+/// - 流式阶段：reasoning 灰色增量输出，answer 直接打印 raw markdown
+/// - finish 后：进入 alternate screen，展示可滚动的 Markdown 渲染视图
+pub struct TextRenderer {
+    reasoning_buffer: String,
+    answer_buffer: String,
+    reasoning_rendered_bytes: usize,
+    answer_rendered_bytes: usize,
+}
 
+impl TextRenderer {
+    pub fn new() -> Self {
         Self {
             reasoning_buffer: String::new(),
             answer_buffer: String::new(),
             reasoning_rendered_bytes: 0,
-            skin,
+            answer_rendered_bytes: 0,
         }
     }
 
@@ -43,56 +41,71 @@ impl ReasoningDisplay {
         self.answer_buffer.push_str(text);
     }
 
-    /// 流式阶段渲染入口：每次有新数据时调用
-    /// - reasoning：增量输出灰色原文
-    /// - answer：暂不输出，等 finish() 统一渲染
+    /// 流式阶段调用：reasoning 灰色增量输出，answer 直接打印原始文本
     pub fn render(&mut self) -> io::Result<()> {
         let mut stdout = io::stdout();
-        self.render_reasoning_incremental(&mut stdout)?;
+        self.flush_reasoning(&mut stdout)?;
+        self.flush_answer_raw(&mut stdout)?;
         stdout.flush()
     }
 
-    /// 增量输出 reasoning 新增文本（灰色）
-    fn render_reasoning_incremental(&mut self, stdout: &mut impl Write) -> io::Result<()> {
+    fn flush_reasoning(&mut self, stdout: &mut impl Write) -> io::Result<()> {
         let new_bytes = &self.reasoning_buffer.as_bytes()[self.reasoning_rendered_bytes..];
         if new_bytes.is_empty() {
             return Ok(());
         }
-        // Safety: reasoning_buffer 是合法 UTF-8，切片按字节偏移量，追加时保证对齐
         let new_text = std::str::from_utf8(new_bytes).unwrap_or_default();
-
         stdout.queue(SetForegroundColor(Color::DarkGrey))?;
         stdout.queue(Print(new_text))?;
         stdout.queue(ResetColor)?;
-
         self.reasoning_rendered_bytes = self.reasoning_buffer.len();
         Ok(())
     }
 
-    /// 流式结束后调用：确保 reasoning 末尾换行，再用 termimad 渲染完整 Markdown answer
-    pub fn finish(self) -> io::Result<()> {
-        let mut stdout = io::stdout();
+    fn flush_answer_raw(&mut self, stdout: &mut impl Write) -> io::Result<()> {
+        let new_bytes = &self.answer_buffer.as_bytes()[self.answer_rendered_bytes..];
+        if new_bytes.is_empty() {
+            return Ok(());
+        }
+        // 首次输出 answer 时，确保与 reasoning 之间有空行分隔
+        if self.answer_rendered_bytes == 0 && !self.reasoning_buffer.is_empty() {
+            let separator = if self.reasoning_buffer.ends_with('\n') {
+                "\n"
+            } else {
+                "\n\n"
+            };
+            stdout.queue(Print(separator))?;
+        }
+        let new_text = std::str::from_utf8(new_bytes).unwrap_or_default();
+        stdout.queue(Print(new_text))?;
+        self.answer_rendered_bytes = self.answer_buffer.len();
+        Ok(())
+    }
 
-        if !self.reasoning_buffer.is_empty() && !self.reasoning_buffer.ends_with('\n') {
+    /// 流式结束后调用：进入 alternate screen，展示可滚动的渲染后 Markdown
+    /// 只返回 answer 部分的 markdown（不包含 reasoning）
+    pub fn finish(self) -> io::Result<String> {
+        if self.answer_buffer.is_empty() {
+            return Ok(String::new());
+        }
+
+        // 确保 raw 输出末尾有换行
+        let mut stdout = io::stdout();
+        if !self.answer_buffer.ends_with('\n') {
             writeln!(stdout)?;
         }
+        stdout.flush()?;
 
-        if !self.answer_buffer.is_empty() {
-            // reasoning 和 answer 之间加一个空行分隔
-            if !self.reasoning_buffer.is_empty() {
-                writeln!(stdout)?;
-            }
-            stdout.flush()?;
-            self.skin.print_text(&self.answer_buffer);
-        }
-
-        writeln!(stdout)?;
-        stdout.flush()
+        show_markdown_view(&self.answer_buffer, make_answer_skin())?;
+        
+        // 只返回 answer 部分
+        Ok(self.answer_buffer.clone())
     }
 }
 
-impl Default for ReasoningDisplay {
+impl Default for TextRenderer {
     fn default() -> Self {
         Self::new()
     }
 }
+

@@ -19,9 +19,10 @@ use tai_core::{TaiError, TaiResult};
 use tokio::time::{sleep, Duration};
 use tracing::{debug, error, warn};
 
-const IS_TEST: bool = true;
-const TEST_FILE: &str = "D:/program/proj/tai/test_response.md";
-const TEST_DELAY_MS: u64 = 50;
+const IS_TEST: bool = false;
+const TEST_FILE: &str = "D:/program/proj/tai/assets/test_response.md";
+const TEST_REASONING_FILE: &str = "D:/program/proj/tai/assets/test_reasoning.md";
+const TEST_DELAY_MS: u64 = 100;
 
 #[derive(Debug, Clone)]
 pub enum StreamChunk {
@@ -150,49 +151,57 @@ where
     Ok(full_response)
 }
 
-/// 测试模式：从本地文件读取并模拟流式输出
+/// 测试模式：先流式输出 reasoning 文件，再流式输出 answer 文件
 async fn chat_stream_test_mode<F>(mut on_chunk: F) -> TaiResult<String>
 where
     F: FnMut(StreamChunk) -> TaiResult<()>,
 {
-    // 获取测试文件路径
-    let test_file = TEST_FILE;
-    
-    debug!("测试模式：从文件读取响应: {}", test_file);
-    
-    // 读取文件内容
-    let content = tokio::fs::read_to_string(&test_file).await.map_err(|e| {
-        error!("无法读取测试文件 {}: {}", test_file, e);
-        TaiError::FileError(format!("无法读取测试文件 {}: {}", test_file, e))
+    debug!("测试模式已启用");
+
+    stream_file(TEST_REASONING_FILE, |text| {
+        on_chunk(StreamChunk::Reasoning(text))
+    })
+    .await?;
+
+    let answer = stream_file(TEST_FILE, |text| {
+        on_chunk(StreamChunk::Answer(text))
+    })
+    .await?;
+
+    debug!("测试模式输出完成");
+    Ok(answer)
+}
+
+/// 按行读取文件并模拟流式回调，返回完整内容
+async fn stream_file<F>(path: &str, mut on_chunk: F) -> TaiResult<String>
+where
+    F: FnMut(String) -> TaiResult<()>,
+{
+    debug!("流式读取文件: {}", path);
+
+    let content = tokio::fs::read_to_string(path).await.map_err(|e| {
+        error!("无法读取文件 {}: {}", path, e);
+        TaiError::FileError(format!("无法读取文件 {}: {}", path, e))
     })?;
-    
+
     if content.is_empty() {
-        warn!("测试文件为空");
+        warn!("文件为空: {}", path);
         return Ok(String::new());
     }
-    
-    debug!("成功读取测试文件，内容长度: {} 字符", content.len());
-    
-    // 模拟流式输出，按行发送
-    let mut full_response = String::new();
+
     let lines: Vec<&str> = content.lines().collect();
-    
+    let mut full = String::new();
+
     for (i, line) in lines.iter().enumerate() {
-        // 添加换行符（除了最后一行）
-        let chunk_text = if i < lines.len() - 1 {
+        let chunk = if i < lines.len() - 1 {
             format!("{}\n", line)
         } else {
             line.to_string()
         };
-        
-        // 发送块
-        on_chunk(StreamChunk::Answer(chunk_text.clone()))?;
-        full_response.push_str(&chunk_text);
-        
-        // 模拟网络延迟（可配置）
+        on_chunk(chunk.clone())?;
+        full.push_str(&chunk);
         sleep(Duration::from_millis(TEST_DELAY_MS)).await;
     }
-    
-    debug!("测试模式输出完成，总长度: {} 字符", full_response.len());
-    Ok(full_response)
+
+    Ok(full)
 }
