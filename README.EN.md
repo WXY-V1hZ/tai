@@ -13,6 +13,17 @@ Tai is a Rust-based CLI tool that brings conversational AI to your terminal, wit
 
 ## Key Features
 
+### ⚡ Command Generation (`tai go`)
+
+Natural language to command line conversion:
+
+```bash
+tai go "list all rust files"
+# Generates and copies to clipboard: ls **/*.rs
+```
+
+![tai-go-demo](doc/tai-go-demo.gif)
+
 ### 🤖 AI Conversation (`tai ask`)
 
 Stream responses from AI models directly in your terminal, with real-time reasoning process visualization:
@@ -66,17 +77,6 @@ Supported providers:
 - **OpenAI**: GPT-4o, GPT-4o-mini
 - **DeepSeek**: DeepSeek-Chat, DeepSeek-Reasoner
 - Custom providers (via API compatibility)
-
-### ⚡ Command Generation (`tai go`)
-
-Natural language to command line conversion:
-
-```bash
-tai go "list all rust files"
-# Generates and copies to clipboard: ls **/*.rs
-```
-
-![tai-go-demo](doc/tai-go-demo.gif)
 
 ### 🔧 System Info (`tai init`)
 
