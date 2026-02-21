@@ -54,7 +54,7 @@
                         <a href="#features" class="hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium">功能</a>
                         <a href="#installation" class="hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium">安装</a>
                         <a href="#configuration" class="hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium">配置</a>
-                        <a href="https://github.com/yourusername/tai" target="_blank" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors">GitHub</a>
+                        <a href="https://github.com/WXY-V1hZ/tai" target="_blank" class="bg-primary hover:bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium transition-colors">GitHub</a>
                     </div>
                 </div>
             </div>
@@ -76,7 +76,7 @@
                 <a href="#installation" class="px-8 py-3 bg-primary hover:bg-blue-600 text-white font-bold rounded-lg transition-all transform hover:scale-105 shadow-lg shadow-blue-500/30">
                     快速开始
                 </a>
-                <a href="https://github.com/yourusername/tai" target="_blank" class="px-8 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg border border-gray-700 transition-all">
+                <a href="https://github.com/WXY-V1hZ/tai" target="_blank" class="px-8 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-lg border border-gray-700 transition-all">
                     查看源码
                 </a>
             </div>
@@ -156,15 +156,15 @@
                     <div class="inline-block p-2 bg-purple-500/10 rounded-lg mb-4">
                         <span class="text-2xl">🎛️</span>
                     </div>
-                    <h3 class="text-2xl font-bold mb-4">多模型管理</h3>
+                    <h3 class="text-2xl font-bold mb-4">多模型管理与配置</h3>
                     <p class="text-gray-400 mb-6">
-                        轻松在不同 AI 模型和厂商间切换。支持 OpenAI、DeepSeek 等主流厂商，也可通过 API 兼容性支持自定义厂商。
+                        轻松在不同 AI 模型和厂商间切换。支持 OpenAI、DeepSeek 等主流厂商，通过直观的 TUI 界面管理 API 密钥和 Base URL。
                     </p>
                     <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm border border-gray-800">
                         <div class="text-green-400">$ tai model</div>
                         <div class="text-gray-500 mt-1"># 交互式选择模型</div>
-                        <div class="text-green-400 mt-3">$ tai model gpt-4o-mini</div>
-                        <div class="text-gray-500 mt-1"># 快速切换</div>
+                        <div class="text-green-400 mt-3">$ tai model config</div>
+                        <div class="text-gray-500 mt-1"># 图形化配置厂商信息</div>
                     </div>
                 </div>
                 <div class="rounded-xl overflow-hidden shadow-xl border border-white/10">
@@ -189,7 +189,7 @@
                 </h3>
                 <div class="relative group">
                     <pre class="font-mono text-sm text-gray-300 bg-black/50 p-4 rounded-lg overflow-x-auto">
-git clone https://github.com/yourusername/tai.git
+git clone https://github.com/WXY-V1hZ/tai.git
 cd tai
 cargo build --release</pre>
                 </div>
@@ -223,28 +223,36 @@ cargo build --release</pre>
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-white mb-4">快速配置</h2>
-                <p class="text-gray-400">设置 API 密钥以启用 AI 功能</p>
+                <p class="text-gray-400">零门槛上手，自动引导配置</p>
             </div>
 
             <div class="prose prose-invert max-w-none">
-                <p class="text-gray-400 mb-4">在 <code class="text-primary">~/.tai/providers.json</code> 中添加以下内容：</p>
-                <div class="bg-gray-900 rounded-xl p-6 border border-white/10 font-mono text-sm overflow-x-auto">
-<pre class="text-gray-300">
-[
-  {
-    <span class="text-purple-400">"provider"</span>: <span class="text-green-400">"openai"</span>,
-    <span class="text-purple-400">"base_url"</span>: <span class="text-green-400">"https://api.openai.com/v1"</span>,
-    <span class="text-purple-400">"api_key"</span>: <span class="text-green-400">"sk-your-api-key-here"</span>,
-    <span class="text-purple-400">"model_names"</span>: [<span class="text-green-400">"gpt-4o-mini"</span>, <span class="text-green-400">"gpt-4o"</span>]
-  },
-  {
-    <span class="text-purple-400">"provider"</span>: <span class="text-green-400">"deepseek"</span>,
-    <span class="text-purple-400">"base_url"</span>: <span class="text-green-400">"https://api.deepseek.com"</span>,
-    <span class="text-purple-400">"api_key"</span>: <span class="text-green-400">"sk-your-api-key-here"</span>,
-    <span class="text-purple-400">"model_names"</span>: [<span class="text-green-400">"deepseek-chat"</span>, <span class="text-green-400">"deepseek-reasoner"</span>]
-  }
-]
-</pre>
+                <p class="text-gray-400 mb-8 text-center">无需手动编辑配置文件。首次运行或缺少密钥时，Tai 会自动启动交互式配置界面。</p>
+                
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="bg-gray-900 rounded-xl p-6 border border-white/10">
+                        <h4 class="text-lg font-bold text-white mb-3">1. 全局设置</h4>
+                        <div class="bg-black/50 p-4 rounded-lg font-mono text-sm mb-3">
+                            <span class="text-green-400">$ tai config</span>
+                        </div>
+                        <p class="text-sm text-gray-400">
+                            调整 Markdown 渲染、自动复制、日志级别等全局选项。支持交互式 TUI 修改。
+                        </p>
+                    </div>
+
+                    <div class="bg-gray-900 rounded-xl p-6 border border-white/10">
+                        <h4 class="text-lg font-bold text-white mb-3">2. 模型厂商配置</h4>
+                        <div class="bg-black/50 p-4 rounded-lg font-mono text-sm mb-3">
+                            <span class="text-green-400">$ tai model config</span>
+                        </div>
+                        <p class="text-sm text-gray-400">
+                            图形化管理各厂商的 Base URL 和 API Key。无需触碰 JSON 文件。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-8 text-center">
+                    <p class="text-gray-500 text-sm">当然，如果你喜欢，依然可以直接编辑 <code class="text-primary">~/.tai/providers.json</code> 和 <code class="text-primary">~/.tai/config.json</code>。</p>
                 </div>
             </div>
         </div>
@@ -259,7 +267,7 @@ cargo build --release</pre>
                     <p class="text-gray-500 text-sm mt-1">AI 驱动的下一代命令行体验</p>
                 </div>
                 <div class="flex space-x-6">
-                    <a href="https://github.com/yourusername/tai" class="text-gray-400 hover:text-white transition-colors">
+                    <a href="https://github.com/WXY-V1hZ/tai" class="text-gray-400 hover:text-white transition-colors">
                         <span class="sr-only">GitHub</span>
                         <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"></path></svg>
                     </a>
