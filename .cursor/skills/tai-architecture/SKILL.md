@@ -5,442 +5,274 @@ description: Tai 项目架构理解和模块职责指南。在需要了解项目
 
 # Tai 项目架构指南
 
-## 项目概览
-
-**名称**: Tai (态)  
-**类型**: AI 驱动的命令行助手  
-**语言**: Rust  
-**架构**: Workspace 多模块架构
-
 ## Workspace 结构
 
 ```
 tai/
-├── Cargo.toml              # workspace 根配置
-├── tai/                    # 主二进制 crate
-│   ├── Cargo.toml
-│   └── src/
-│       └── main.rs         # 程序入口
-├── crates/
-│   ├── tai-command/        # 命令行接口
-│   ├── tai-ai/             # AI 核心逻辑
-│   ├── tai-tui/            # TUI 组件库
-│   ├── tai-core/           # 公共工具库
-│   └── tai-pty/            # PTY 终端模拟 (待开发)
-└── README.md
+├── Cargo.toml
+├── assets/
+│   └── providers.json          # 默认 provider 配置模板（编译期嵌入）
+├── tai/src/main.rs             # 主二进制入口
+└── crates/
+    ├── tai-command/            # CLI 命令处理
+    ├── tai-ai/                 # AI 核心逻辑
+    ├── tai-tui/                # TUI 组件库
+    └── tai-core/               # 公共工具库
 ```
 
-## 模块职责和依赖关系
+## 依赖关系
 
 ```
-tai (主程序)
- ├─> tai-command (CLI 解析和命令处理)
- │    ├─> tai-ai (AI 交互)
- │    ├─> tai-tui (TUI 组件)
- │    └─> tai-core (工具库)
- ├─> tai-ai
- │    └─> tai-core
- ├─> tai-tui
- │    └─> tai-core
- └─> tai-core (基础库，无外部依赖)
+tai-command ──→ tai-ai ──→ tai-core
+            ──→ tai-tui
+            ──→ tai-core
+tai-tui 无内部依赖（tai-core 除外不依赖其他内部 crate）
 ```
 
 ## 各 Crate 详解
 
 ### tai-command
 
-**职责**: 命令行接口，使用 `clap` 解析参数
+**职责**: CLI 参数解析 + 命令编排
 
 **主要文件**:
-- `lib.rs` - 定义 CLI 参数结构
-- `ask.rs` - `tai ask` 命令处理
-- `ask/history.rs` - 历史记录管理子模块
-- `go.rs` - `tai go` 命令生成
-- `do.rs` - `tai do` 命令执行
-- `model.rs` - `tai model` 模型管理
-- `init.rs` - `tai init` 系统信息收集
-- `config.rs` - 配置文件管理
+- `lib.rs` - Commands 枚举定义
+- `provider.rs` - `ensure_active_provider()` / `recover_auth_error()`
+- `ask.rs` - `tai ask`（含 auth 重试循环）
+- `go.rs` - `tai go`（含 auth 重试循环）
+- `model.rs` - `tai model` / `tai model config`
+- `config.rs` - `tai config`（TaiConfig ↔ SettingItem 转换）
+- `ask/history.rs` - 历史记录子模块
 
-**关键实现**:
+**当前 CLI 结构**:
 
 ```rust
-// CLI 参数结构
-#[derive(Parser)]
-pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
+enum Commands {
+    Ask(AskArgs),          // AI 对话
+    Go(GoArgs),            // 命令生成
+    Model(ModelArgs),      // 模型管理（含 Config 子命令）
+    Config,                // 应用配置
+    Do(DoArgs),            // 执行命令（开发中）
 }
 
-#[derive(Subcommand)]
-pub enum Commands {
-    Ask(AskArgs),     // AI 对话
-    Go(GoArgs),       // 命令生成
-    Model(ModelArgs), // 模型管理
-    Init,             // 系统信息
+// tai model config 子命令
+enum ModelSubcommand {
+    Config,
 }
 ```
 
-**扩展新命令**:
+**provider.rs 关键模式**:
 
-1. 在 `Commands` 枚举添加新变体
-2. 创建对应的参数结构
-3. 在 `main.rs` 添加命令处理分支
-4. 实现命令处理函数
+```rust
+// 解析激活 provider，api_key 为空时触发 TUI 引导
+pub async fn ensure_active_provider() -> TaiResult<(ProviderConfig, String)>
+
+// 认证失败后清空 key 并重新引导
+pub async fn recover_auth_error(provider_name: &str) -> TaiResult<(ProviderConfig, String)>
+```
+
+**ask.rs / go.rs Auth 重试循环**:
+
+```rust
+let mut context = ensure_active_provider().await?;
+loop {
+    match do_ask(&context.0, &context.1, &prompt, &config).await {
+        Ok(markdown) => { /* 保存历史 */ return Ok(()); }
+        Err(TaiError::AuthError(ref name)) => {
+            context = recover_auth_error(name).await?;
+        }
+        Err(e) => return Err(e),
+    }
+}
+```
+
+---
 
 ### tai-ai
 
-**职责**: AI 交互核心，管理多厂商 AI 客户端
+**职责**: AI 交互核心，多厂商客户端管理
 
 **主要文件**:
-- `lib.rs` - AI 客户端单例、流式输出核心
-- `config.rs` - Provider 配置管理
-- `provider.rs` - Provider 枚举定义
+- `lib.rs` - `chat()` / `chat_stream()` + 错误分类
+- `config.rs` - Provider 配置的 load/save
+- `provider.rs` - `AiClient` 枚举，OnceLock 客户端单例
 
-**关键技术**:
-
-#### 单例模式
-
-使用 `OnceLock` 实现线程安全的客户端单例：
+**错误分类** (`classify_error` in `lib.rs`):
 
 ```rust
-static OPENAI_CLIENT: OnceLock<OpenAIClient> = OnceLock::new();
-static DEEPSEEK_CLIENT: OnceLock<DeepSeekClient> = OnceLock::new();
-
-fn get_openai_client() -> &'static OpenAIClient {
-    OPENAI_CLIENT.get_or_init(|| {
-        // 初始化逻辑
-    })
+fn classify_error(err: &str, provider: &ProviderConfig) -> TaiError {
+    if 包含 "401" / "authentication" / "unauthorized" → TaiError::AuthError(provider_name)
+    if 包含 "connect" / "dns" / "timed out"          → TaiError::ConnectionError(base_url)
+    else                                               → TaiError::AiError(msg)
 }
 ```
 
-**注意**: `rig-core` 的 OpenAI 客户端不兼容 DeepSeek，必须使用 DeepSeek 专用客户端。
+**config.rs 关键函数**:
+- `load_providers()` — 不存在时用 `include_str!("../../../assets/providers.json")` 自动创建
+- `save_providers(&[ProviderConfig])` — 通用保存（`update_provider_api_key` 基于此实现）
+- `update_provider_api_key(name, key)` — 更新单个 provider 的 api_key
 
-#### 流式输出
-
-```rust
-pub async fn chat_stream<F1, F2>(
-    on_reasoning: F1,
-    on_answer: F2,
-) -> Result<String>
-where
-    F1: Fn(&str) + Send + Sync,  // reasoning 回调
-    F2: Fn(&str) + Send + Sync,  // answer 回调
-{
-    let mut stream = response.stream().await?;
-    
-    while let Some(chunk) = stream.next().await {
-        if is_reasoning {
-            on_reasoning(&chunk);
-        } else {
-            on_answer(&chunk);
-        }
-    }
-}
-```
-
-#### 测试模式
-
-```rust
-const IS_TEST: bool = cfg!(feature = "test");
-
-async fn chat_stream_test_mode() -> Result<String> {
-    let content = fs::read_to_string("test_response.md")?;
-    // 模拟流式输出
-}
-```
-
-**添加新 Provider**:
-
-1. 在 `provider.rs` 添加新枚举变体
-2. 在 `lib.rs` 添加对应的客户端单例
-3. 在 `chat_stream()` 添加客户端选择逻辑
-4. 更新 `providers.json` 配置格式
+---
 
 ### tai-tui
 
-**职责**: TUI 组件库
+**职责**: TUI 组件库，**不依赖 tai-ai**（使用自定义数据结构避免循环依赖）
 
-**主要文件**:
-- `reasoning.rs` - Markdown 流式渲染引擎
-- `viewer.rs` - MadView 公共展示模块
-- `model_selector.rs` - 交互式模型选择器
-- `spinner.rs` - 加载动画
+**文件及组件**:
 
-**关键技术**:
+| 文件 | 导出 | 用途 |
+|------|------|------|
+| `reasoning.rs` | `TextRenderer` | 流式渲染 + `finish(render_markdown: bool)` |
+| `viewer.rs` | `show_markdown_view` | alternate screen Markdown 渲染 |
+| `model_selector.rs` | `select_model`, `ModelItem` | 模型选择列表 |
+| `api_key_input.rs` | `prompt_api_key` | API Key 输入（掩码，增量渲染） |
+| `provider_config.rs` | `config_providers`, `ProviderEntry` | Provider 三屏编辑 TUI |
+| `settings.rs` | `show_settings`, `SettingItem`, `SettingValue` | 应用配置设置 TUI |
+| `spinner.rs` | `Spinner` | 加载动画 |
 
-#### Markdown 渲染策略
+**TUI 渲染模式**:
+
+```
+非全屏（model_selector, api_key_input, provider_config）:
+  - 记录 start_row，用 Clear(FromCursorDown) 重绘
+  - 文字输入类：draw_static() 只绘一次，按键时只更新输入行（避免闪烁）
+
+全屏（settings, show_markdown_view）:
+  - EnterAlternateScreen + Clear(All) + MoveTo(0,0)
+  - 彻底避免底部追加问题
+  - raw_mode 必须在 EnterAlternateScreen 之前启用（Windows 要求）
+  - 进入后调用 flush_pending_events() 清除积压事件
+```
+
+**SettingValue 类型**（`settings.rs`）:
 
 ```rust
-pub struct ReasoningRenderer {
-    reasoning_buffer: String,
-    answer_buffer: String,
-}
-
-impl ReasoningRenderer {
-    // 流式阶段：增量输出
-    pub fn print_reasoning(&mut self, text: &str) {
-        // 灰色输出 reasoning
-    }
-    
-    pub fn print_answer(&mut self, text: &str) {
-        // 原始输出 answer
-    }
-    
-    // 完成阶段：美化展示
-    pub fn finish(self) -> Result<String> {
-        show_markdown_view(&self.answer_buffer, skin)?;
-        Ok(self.answer_buffer)  // 只返回 answer
-    }
+pub enum SettingValue {
+    Bool(bool),                                    // Space 切换，●/○ 显示
+    Select { options: Vec<String>, selected },      // Space 循环，◈ 显示
+    Int { value: i64, min: i64, max: i64 },        // ← → 调整，‹ n › 显示
 }
 ```
 
-#### 公共展示模块
+**TextRenderer**（`reasoning.rs`）:
 
 ```rust
-// viewer.rs - 避免代码重复
-pub fn show_markdown_view(markdown: &str, skin: MadSkin) -> Result<()> {
-    execute!(stdout(), EnterAlternateScreen)?;
-    
-    let area = terminal_size()?;
-    let mut view = MadView::from(markdown, area, skin);
-    
-    // 事件循环：上下键滚动，q/ESC 退出
-    loop {
-        view.write_on(&mut stdout())?;
-        match read()? {
-            Event::Key(KeyEvent { code: KeyCode::Up, .. }) => {
-                view.try_scroll_lines(-1);
-            }
-            // ...
-        }
-    }
-    
-    execute!(stdout(), LeaveAlternateScreen)?;
-    Ok(())
-}
+// 流式阶段
+renderer.append_reasoning(&text); renderer.render()?;
+renderer.append_answer(&text);    renderer.render()?;
+
+// 完成阶段：render_markdown 由 TaiConfig.show_markdown_view 控制
+let markdown = renderer.finish(config.show_markdown_view)?;
 ```
 
-**组件使用场景**:
-- `reasoning.rs` - `tai ask` 命令的回答展示
-- `viewer.rs` - 历史记录查看、任何 markdown 展示
-- `model_selector.rs` - `tai model` 命令的模型选择
-- `spinner.rs` - API 调用等待动画
+---
 
 ### tai-core
 
-**职责**: 公共工具库，无外部业务依赖
+**职责**: 公共工具库
 
 **主要文件**:
-- `logging.rs` - 日志系统
-- `error.rs` - 自定义错误类型
-- `lib.rs` - 公共工具函数
+- `error.rs` - `TaiError` 枚举（含 `AuthError`, `ConnectionError`）
+- `logging.rs` - 双层日志（控制台无时间戳 `.without_time()`，文件含时间戳）
+- `config.rs` - `TaiConfig` 结构体（load/save `~/.tai/config.json`）
 
-**日志配置**:
+**TaiError 关键变体**:
 
 ```rust
-pub fn init_logging() -> Result<()> {
-    let log_dir = home_dir()?.join(".tai");
-    
-    let file_appender = tracing_appender::rolling::hourly(
-        &log_dir,
-        "tai.log"
-    );
-    
-    // 终端: info, 文件: debug
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::DEBUG)
-        .finish();
-    
-    tracing::subscriber::set_global_default(subscriber)?;
-    Ok(())
+AuthError(String)       // provider_name，触发 API Key 重新输入
+ConnectionError(String) // base_url，提示检查 base_url 配置
+```
+
+**TaiConfig**（`~/.tai/config.json`，不存在时使用默认值）:
+
+```rust
+pub struct TaiConfig {
+    pub show_markdown_view: bool,  // ask 后是否展示 Markdown 渲染界面
+    pub auto_copy_command: bool,
+    pub save_history: bool,
+    pub show_reasoning: bool,
+    pub compact_output: bool,
+    pub debug_logging: bool,
+    pub max_history_count: u32,
+    pub output_theme: String,
 }
 ```
 
-**滚动策略**:
-- 按小时滚动
-- 最多保留 10 个文件
-- 文件名: `tai-{timestamp}.log`
-
-### tai-pty (待开发)
-
-**职责**: PTY 终端模拟
-
-**计划功能**:
-- 命令执行虚拟终端
-- ANSI 转义序列支持
-- 输入输出重定向
+---
 
 ## 配置文件
 
-### providers.json
+| 文件 | 位置 | 说明 |
+|------|------|------|
+| `providers.json` | `~/.tai/providers.json` | Provider 列表，api_key 为空时触发 TUI |
+| `state.json` | `~/.tai/state.json` | 当前激活的 provider/model |
+| `config.json` | `~/.tai/config.json` | 应用配置，缺失时用默认值 |
+| 历史记录 | `~/.tai/cache/history/` | `YYYYMMDD_HHMMSS.md` |
 
-**位置**: `~/.tai/providers.json`
+**providers.json** `api_key` 为空 → `ensure_active_provider()` 触发 `prompt_api_key()` TUI，填写后写回文件。
 
-```json
-[
-  {
-    "provider": "openai",
-    "base_url": "https://api.openai.com/v1",
-    "api_key": "sk-...",
-    "model_names": ["gpt-4o-mini", "gpt-4o"]
-  },
-  {
-    "provider": "deepseek",
-    "base_url": "https://api.deepseek.com",
-    "api_key": "sk-...",
-    "model_names": ["deepseek-chat", "deepseek-reasoner"]
-  }
-]
-```
-
-### active_model.txt
-
-**位置**: `~/.tai/active_model.txt`
-
-格式: `provider/model_name`
-
-示例: `deepseek/deepseek-reasoner`
-
-### 历史记录缓存
-
-**位置**: `~/.tai/cache/history/`
-
-文件格式: `YYYYMMDD_HHMMSS.md`
+---
 
 ## 核心流程
 
-### tai ask 命令流程
+### tai ask
 
 ```
-用户输入
-  ↓
-ask.rs: 解析参数 (-c, -f)
-  ↓
-[分支1: -c 参数] → history.rs: show_history()
-  ↓
-[分支2: 正常提问]
-  ↓
-ai.rs: chat_stream() - 调用 AI API
-  ↓
-reasoning.rs: 流式渲染
-  ├─ reasoning: 灰色增量输出
-  └─ answer: 原始 markdown 输出
-  ↓
-reasoning.rs: finish() - alternate screen 美化展示
-  ↓
-history.rs: save_history() - 自动保存
-  ↓
-返回结果
+AskArgs::handle
+  ├─ TaiConfig::load()                    # 加载配置
+  ├─ ensure_active_provider()             # 若 api_key 空 → TUI 引导
+  └─ loop:
+       do_ask(provider, model, prompt, config)
+         ├─ Spinner + TextRenderer
+         ├─ chat_stream() 流式回调
+         └─ renderer.finish(config.show_markdown_view)
+       Ok  → save_history() → return
+       AuthError → recover_auth_error() → retry
+       Err → return Err
 ```
 
-### tai model 命令流程
+### tai model
 
 ```
-用户输入
-  ↓
-model.rs: 解析参数
-  ↓
-[分支1: 指定模型名] → 直接切换
-  ↓
-[分支2: 交互式选择]
-  ↓
-model_selector.rs: 显示模型列表
-  ↓
-用户上下键选择 + Enter 确认
-  ↓
-更新 active_model.txt
-  ↓
-显示切换成功信息
+ModelArgs::handle
+  ├─ subcommand=Config → handle_config()
+  │    └─ config_providers(entries) TUI → save_providers()
+  ├─ switch=Some(name) → switch_model()
+  └─ 无参数 → select_model() TUI → save_active_model()
 ```
+
+### tai config
+
+```
+ConfigCommand::handle
+  ├─ TaiConfig::load()
+  ├─ config_to_items(&config) → Vec<SettingItem>
+  ├─ show_settings(items) TUI（alternate screen）
+  └─ items_to_config() → new_config.save()
+```
+
+---
 
 ## 扩展指南
 
-### 添加新功能
-
-1. **确定功能位置**:
-   - CLI 相关 → `tai-command`
-   - AI 交互 → `tai-ai`
-   - UI 组件 → `tai-tui`
-   - 工具函数 → `tai-core`
-
-2. **创建子模块**（如果功能复杂）:
-   ```
-   crates/tai-command/src/
-   ├── new_feature.rs        # 主文件
-   └── new_feature/          # 子模块
-       ├── mod.rs
-       ├── handler.rs
-       └── utils.rs
-   ```
-
-3. **更新 CLI 定义**:
-   在 `tai-command/src/lib.rs` 添加新命令
-
-4. **实现功能逻辑**
-
-5. **添加测试**
+### 添加新命令
+1. `lib.rs` Commands 枚举添加变体
+2. 新建 `command_name.rs`
+3. `lib.rs` handle() 添加分支
 
 ### 添加新 AI Provider
+1. `tai-ai/src/provider.rs` 添加 `AiClient` 枚举变体
+2. `tai-ai/src/lib.rs` 添加客户端单例 + `classify_error` + `chat_stream` 分支
+3. `assets/providers.json` 添加默认条目（api_key 留空）
 
-1. 在 `rig-core` 中查找对应的 Provider 实现
-2. 如果没有，需要自定义客户端（参考 DeepSeek 实现）
-3. 在 `tai-ai/src/provider.rs` 添加枚举变体
-4. 在 `tai-ai/src/lib.rs` 添加客户端单例和初始化逻辑
-5. 更新 `chat_stream()` 函数的 Provider 选择逻辑
-6. 更新配置文件格式说明
+### 添加新 TUI 组件
+- **非全屏**（小列表/输入）: 参考 `api_key_input.rs`，记录 `start_row`，输入行增量更新
+- **全屏**（设置/查看）: 参考 `settings.rs` / `viewer.rs`，使用 alternate screen
 
-### 优化 TUI 组件
+### 添加新配置项
+1. `tai-core/src/config.rs` TaiConfig 添加字段 + Default 值
+2. `tai-command/src/config.rs` 的 `config_to_items` / `items_to_config` 添加对应项
+3. 在相关命令中使用 `TaiConfig::load()`
 
-1. **避免代码重复**: 提取公共逻辑到 `viewer.rs` 或新模块
-2. **alternate screen 使用**: 对于全屏交互界面
-3. **流式输出优化**: 平衡实时性和稳定性
-
-## 依赖关系图
-
-```
-External Crates:
-├── clap         → CLI 解析
-├── rig-core     → AI 客户端
-├── tokio        → 异步运行时
-├── crossterm    → 终端控制
-├── termimad     → Markdown 渲染
-├── tracing      → 日志系统
-├── chrono       → 时间处理
-├── dirs         → 用户目录
-└── anyhow       → 错误处理
-
-Internal Crates:
-tai (main)
- ├── tai-command
- │    ├── tai-ai
- │    │    └── tai-core
- │    ├── tai-tui
- │    │    └── tai-core
- │    └── tai-core
- └── tai-core
-```
-
-## 性能考虑
-
-1. **单例客户端**: 避免重复初始化 AI 客户端
-2. **流式输出**: 不等待完整响应，边接收边展示
-3. **缓冲写入**: 文件操作使用 `BufWriter`
-4. **异步处理**: 所有 IO 操作异步化
-
-## 常见架构问题
-
-### 1. 模块间循环依赖
-
-**解决**: 提取公共逻辑到 `tai-core`，或调整依赖方向
-
-### 2. 重复代码
-
-**解决**: 提取到公共模块（如 `viewer.rs`）
-
-### 3. 文件过大
-
-**解决**: 创建子模块（如 `ask/history.rs`）
-
-### 4. 测试困难
-
-**解决**: 使用依赖注入，提供 mock 实现
+### TUI 组件与 tai-ai 解耦
+`tai-tui` 不依赖 `tai-ai`。需要传递 Provider 数据时，在 `tai-tui` 中定义镜像结构体（如 `ProviderEntry`），在 `tai-command` 中做转换。
