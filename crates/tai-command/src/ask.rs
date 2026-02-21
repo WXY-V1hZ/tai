@@ -1,8 +1,10 @@
 use clap::{Args, ValueHint};
-use tai_ai::{chat_stream, load_active_model, load_providers, resolve_active, StreamChunk};
-use tai_core::{TaiError, TaiResult};
-use tai_tui::{TextRenderer, Spinner};
+use tai_ai::{chat_stream, ProviderConfig, StreamChunk};
+use tai_core::{TaiConfig, TaiError, TaiResult};
+use tai_tui::{Spinner, TextRenderer};
 use tracing::debug;
+
+use crate::provider::{ensure_active_provider, recover_auth_error};
 
 mod history;
 use history::show_history;
@@ -23,7 +25,6 @@ pub struct AskArgs {
 
 impl AskArgs {
     pub async fn handle(self) -> TaiResult<()> {
-        // 如果指定了 -c 参数，显示历史记录
         if let Some(count) = self.cache {
             return show_history(count);
         }
@@ -38,55 +39,60 @@ impl AskArgs {
             None => prompt,
         };
 
-        let providers = load_providers()?;
-        if providers.is_empty() {
-            return Err(TaiError::NoProviderConfig);
-        }
+        let config = TaiConfig::load().unwrap_or_default();
+        let mut context = ensure_active_provider().await?;
 
-        let active = load_active_model()?;
-        let (provider, model) = resolve_active(&providers, active.as_ref())
-            .ok_or(TaiError::NoActiveModel)?;
-
-        debug!("使用模型: {}/{}", provider.provider, model);
-        
-        let spinner = Spinner::new("AI 思考中...");
-
-        let mut renderer = TextRenderer::new();
-        let mut first_chunk = true;
-
-        chat_stream(provider, model, &final_prompt, |chunk| {
-            if first_chunk {
-                spinner.finish_and_clear();
-                first_chunk = false;
-            }
-
-            match chunk {
-                StreamChunk::Reasoning(text) => {
-                    debug!("推理块: {} 字符", text.len());
-                    renderer.append_reasoning(&text);
-                    renderer.render()?;
+        loop {
+            debug!("使用模型: {}/{}", context.0.provider, context.1);
+            match do_ask(&context.0, &context.1, &final_prompt, &config).await {
+                Ok(markdown) => {
+                    if !markdown.is_empty() {
+                        if let Err(e) = history::save_history(&markdown) {
+                            debug!("保存历史记录失败: {}", e);
+                        }
+                    }
+                    debug!("Ask 命令完成");
+                    return Ok(());
                 }
-                StreamChunk::Answer(text) => {
-                    debug!("答案块: {} 字符", text.len());
-                    renderer.append_answer(&text);
-                    renderer.render()?;
+                Err(TaiError::AuthError(ref name)) => {
+                    context = recover_auth_error(name).await?;
                 }
-            }
-
-            Ok(())
-        })
-        .await?;
-
-        let markdown = renderer.finish()?;
-        
-        // 保存历史记录
-        if !markdown.is_empty() {
-            if let Err(e) = history::save_history(&markdown) {
-                debug!("保存历史记录失败: {}", e);
+                Err(e) => return Err(e),
             }
         }
-        
-        debug!("Ask 命令完成");
-        Ok(())
     }
+}
+
+async fn do_ask(
+    provider: &ProviderConfig,
+    model: &str,
+    prompt: &str,
+    config: &TaiConfig,
+) -> TaiResult<String> {
+    let spinner = Spinner::new("AI 思考中...");
+    let mut renderer = TextRenderer::new();
+    let mut first_chunk = true;
+
+    chat_stream(provider, model, prompt, |chunk| {
+        if first_chunk {
+            spinner.finish_and_clear();
+            first_chunk = false;
+        }
+        match chunk {
+            StreamChunk::Reasoning(text) => {
+                debug!("推理块: {} 字符", text.len());
+                renderer.append_reasoning(&text);
+                renderer.render()?;
+            }
+            StreamChunk::Answer(text) => {
+                debug!("答案块: {} 字符", text.len());
+                renderer.append_answer(&text);
+                renderer.render()?;
+            }
+        }
+        Ok(())
+    })
+    .await?;
+
+    Ok(renderer.finish(config.show_markdown_view)?)
 }

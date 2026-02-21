@@ -1,9 +1,11 @@
 use arboard::Clipboard;
 use clap::Args;
-use tai_ai::{chat, load_active_model, load_providers, resolve_active};
+use tai_ai::chat;
 use tai_core::{TaiError, TaiResult};
 use tai_tui::Spinner;
 use tracing::{debug, warn};
+
+use crate::provider::{ensure_active_provider, recover_auth_error};
 
 const PROMPT: &str = "\
 你是一名命令行助手，请严格遵循以下规则：
@@ -48,22 +50,29 @@ pub struct GoArgs {
 impl GoArgs {
     pub async fn handle(self) -> TaiResult<()> {
         debug!("Go 命令: 用户输入 = {}", self.user_input);
-        
-        let providers = load_providers()?;
-        if providers.is_empty() {
-            return Err(TaiError::NoProviderConfig);
-        }
-        
-        let active = load_active_model()?;
-        let (provider, model) = resolve_active(&providers, active.as_ref())
-            .ok_or(TaiError::NoActiveModel)?;
 
         let prompt = format!("{} {}", PROMPT, self.user_input);
+        let mut context = ensure_active_provider().await?;
 
-        let spinner = Spinner::new("AI 思考中...");
-        let command = chat(provider, model, &prompt).await?;
-        spinner.finish_and_clear();
-        
+        let command = loop {
+            debug!("使用模型: {}/{}", context.0.provider, context.1);
+            let spinner = Spinner::new("AI 思考中...");
+            match chat(&context.0, &context.1, &prompt).await {
+                Ok(cmd) => {
+                    spinner.finish_and_clear();
+                    break cmd;
+                }
+                Err(TaiError::AuthError(ref name)) => {
+                    spinner.finish_and_clear();
+                    context = recover_auth_error(name).await?;
+                }
+                Err(e) => {
+                    spinner.finish_and_clear();
+                    return Err(e);
+                }
+            }
+        };
+
         println!("{}", command);
 
         match Clipboard::new() {

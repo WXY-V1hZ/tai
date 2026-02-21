@@ -2,13 +2,35 @@ mod config;
 mod provider;
 
 pub use config::{
-    load_active_model, load_providers, resolve_active, save_active_model, ActiveModel,
-    ProviderConfig,
+    load_active_model, load_providers, resolve_active, save_active_model, save_providers,
+    update_provider_api_key, ActiveModel, ProviderConfig,
 };
 
 use provider::{get_client, AiClient};
 
 use futures::StreamExt;
+
+fn classify_error(err: &str, provider: &ProviderConfig) -> TaiError {
+    let lower = err.to_lowercase();
+    if lower.contains("401")
+        || lower.contains("authentication")
+        || lower.contains("unauthorized")
+        || lower.contains("invalid_api_key")
+        || lower.contains("invalid api key")
+    {
+        TaiError::AuthError(provider.provider.clone())
+    } else if lower.contains("connect")
+        || lower.contains("dns")
+        || lower.contains("no such host")
+        || lower.contains("connection refused")
+        || lower.contains("network")
+        || lower.contains("timed out")
+    {
+        TaiError::ConnectionError(provider.base_url.clone())
+    } else {
+        TaiError::AiError(format!("请求失败: {}", err))
+    }
+}
 use rig::{
     agent::MultiTurnStreamItem,
     client::CompletionClient,
@@ -43,13 +65,13 @@ pub async fn chat(
         AiClient::OpenAI(c) => {
             c.agent(model).build().prompt(prompt).await.map_err(|e| {
                 error!("OpenAI API 请求失败: {}", e);
-                TaiError::AiError(format!("OpenAI 请求失败: {}", e))
+                classify_error(&e.to_string(), provider)
             })?
         }
         AiClient::DeepSeek(c) => {
             c.agent(model).build().prompt(prompt).await.map_err(|e| {
                 error!("DeepSeek API 请求失败: {}", e);
-                TaiError::AiError(format!("DeepSeek 请求失败: {}", e))
+                classify_error(&e.to_string(), provider)
             })?
         }
     };
@@ -108,7 +130,7 @@ where
                     Ok(_) => {}
                     Err(e) => {
                         error!("流式请求出错: {}", e);
-                        return Err(TaiError::AiError(format!("流式请求失败: {}", e)));
+                        return Err(classify_error(&e.to_string(), provider));
                     }
                 }
             }
@@ -140,7 +162,7 @@ where
                     Ok(_) => {}
                     Err(e) => {
                         error!("流式请求出错: {}", e);
-                        return Err(TaiError::AiError(format!("流式请求失败: {}", e)));
+                        return Err(classify_error(&e.to_string(), provider));
                     }
                 }
             }

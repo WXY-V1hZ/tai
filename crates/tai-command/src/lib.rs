@@ -2,14 +2,13 @@ mod ask;
 mod config;
 mod r#do;
 mod go;
-mod init;
 mod model;
+mod provider;
 
 pub use ask::AskArgs;
 pub use config::ConfigCommand;
 pub use r#do::DoArgs;
 pub use go::GoArgs;
-pub use init::InitCommand;
 pub use model::ModelArgs;
 
 use clap::{Parser, Subcommand};
@@ -46,7 +45,6 @@ pub enum Commands {
     Do(DoArgs),
     Ask(AskArgs),
     Go(GoArgs),
-    Init,
     Config,
 }
 
@@ -57,7 +55,6 @@ impl Commands {
             Commands::Do(args) => args.handle().await,
             Commands::Ask(args) => args.handle().await,
             Commands::Go(args) => args.handle().await,
-            Commands::Init => InitCommand.handle().await,
             Commands::Config => ConfigCommand.handle().await,
         }
     }

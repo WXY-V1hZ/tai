@@ -1,7 +1,7 @@
-use clap::Args;
-use tai_ai::{load_active_model, load_providers, resolve_active, save_active_model, ActiveModel};
+use clap::{Args, Subcommand};
+use tai_ai::{load_active_model, load_providers, resolve_active, save_active_model, save_providers, ActiveModel};
 use tai_core::{TaiError, TaiResult};
-use tai_tui::{select_model, ModelItem};
+use tai_tui::{config_providers, select_model, ModelItem, ProviderEntry};
 use tracing::debug;
 
 #[derive(Args, Debug)]
@@ -9,10 +9,23 @@ pub struct ModelArgs {
     /// 直接切换到指定模型（不触发 TUI）
     #[arg(short = 's', long = "switch")]
     pub switch: Option<String>,
+
+    #[command(subcommand)]
+    pub subcommand: Option<ModelSubcommand>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ModelSubcommand {
+    /// 编辑各 Provider 的 API Key 和 Base URL
+    Config,
 }
 
 impl ModelArgs {
     pub async fn handle(self) -> TaiResult<()> {
+        if let Some(ModelSubcommand::Config) = self.subcommand {
+            return handle_config();
+        }
+
         let providers = load_providers()?;
         if providers.is_empty() {
             println!("未找到 provider 配置，请检查 ~/.tai/providers.json");
@@ -71,6 +84,46 @@ impl ModelArgs {
 
         Ok(())
     }
+}
+
+fn handle_config() -> TaiResult<()> {
+    let providers = load_providers()?;
+    if providers.is_empty() {
+        println!("未找到 provider 配置，请检查 ~/.tai/providers.json");
+        return Ok(());
+    }
+
+    let entries: Vec<ProviderEntry> = providers
+        .iter()
+        .map(|p| ProviderEntry {
+            name: p.provider.clone(),
+            base_url: p.base_url.clone(),
+            api_key: p.api_key.clone(),
+        })
+        .collect();
+
+    match config_providers(entries) {
+        Ok(Some(updated)) => {
+            let mut new_providers = providers.clone();
+            for entry in &updated {
+                if let Some(p) = new_providers.iter_mut().find(|p| p.provider == entry.name) {
+                    p.base_url = entry.base_url.clone();
+                    p.api_key = entry.api_key.clone();
+                }
+            }
+            save_providers(&new_providers)?;
+            debug!("Provider 配置已保存");
+            println!("  ✓ 配置已保存至 ~/.tai/providers.json");
+        }
+        Ok(None) => {
+            debug!("用户取消了 Provider 配置");
+        }
+        Err(e) => {
+            return Err(TaiError::AiError(format!("TUI 错误: {}", e)));
+        }
+    }
+
+    Ok(())
 }
 
 fn switch_model(providers: &[tai_ai::ProviderConfig], model_name: &str) -> TaiResult<()> {

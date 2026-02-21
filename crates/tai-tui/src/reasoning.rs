@@ -82,23 +82,23 @@ impl TextRenderer {
         Ok(())
     }
 
-    /// 流式结束后调用：进入 alternate screen，展示可滚动的渲染后 Markdown
-    /// 只返回 answer 部分的 markdown（不包含 reasoning）
-    pub fn finish(self) -> io::Result<String> {
+    /// 流式结束后调用，只返回 answer 部分的 markdown（不包含 reasoning）
+    /// render_markdown: 是否进入 alternate screen 展示可滚动的渲染视图
+    pub fn finish(self, render_markdown: bool) -> io::Result<String> {
         if self.answer_buffer.is_empty() {
             return Ok(String::new());
         }
 
-        // 确保 raw 输出末尾有换行
         let mut stdout = io::stdout();
         if !self.answer_buffer.ends_with('\n') {
             writeln!(stdout)?;
         }
         stdout.flush()?;
 
-        show_markdown_view(&self.answer_buffer, make_answer_skin())?;
-        
-        // 只返回 answer 部分
+        if render_markdown {
+            show_markdown_view(&self.answer_buffer, make_answer_skin())?;
+        }
+
         Ok(self.answer_buffer.clone())
     }
 }

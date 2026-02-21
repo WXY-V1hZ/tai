@@ -33,23 +33,34 @@ fn state_path() -> PathBuf {
     tai_dir().join("state.json")
 }
 
+const DEFAULT_PROVIDERS: &str = include_str!("../../../assets/providers.json");
+
 pub fn load_providers() -> TaiResult<Vec<ProviderConfig>> {
     let path = providers_path();
     debug!("加载 provider 配置: {:?}", path);
-    
+
     if !path.exists() {
-        warn!("Provider 配置文件不存在: {:?}", path);
-        return Ok(Vec::new());
+        warn!("Provider 配置文件不存在，创建默认配置: {:?}", path);
+        let dir = path.parent().unwrap();
+        fs::create_dir_all(dir).map_err(|e| {
+            error!("创建 .tai 目录失败: {}", e);
+            TaiError::FileError(format!("无法创建目录 {:?}: {}", dir, e))
+        })?;
+        fs::write(&path, DEFAULT_PROVIDERS).map_err(|e| {
+            error!("写入默认 provider 配置失败: {}", e);
+            TaiError::FileError(format!("无法写入 {:?}: {}", path, e))
+        })?;
+        debug!("默认 provider 配置已写入: {:?}", path);
     }
-    
+
     let content = fs::read_to_string(&path).map_err(|e| {
         error!("读取 provider 配置失败: {}", e);
         TaiError::FileError(format!("无法读取 {:?}: {}", path, e))
     })?;
-    
+
     let providers: Vec<ProviderConfig> = serde_json::from_str(&content)?;
     debug!("成功加载 {} 个 provider 配置", providers.len());
-    
+
     Ok(providers)
 }
 
@@ -90,6 +101,34 @@ pub fn save_active_model(active: &ActiveModel) -> TaiResult<()> {
     
     debug!("成功保存激活模型: {}/{}", active.provider, active.model);
     Ok(())
+}
+
+pub fn save_providers(providers: &[ProviderConfig]) -> TaiResult<()> {
+    let path = providers_path();
+    fs::create_dir_all(path.parent().unwrap()).map_err(|e| {
+        error!("创建目录失败: {}", e);
+        TaiError::FileError(format!("无法创建目录: {}", e))
+    })?;
+    let content = serde_json::to_string_pretty(providers)?;
+    fs::write(&path, content).map_err(|e| {
+        error!("写入 provider 配置失败: {}", e);
+        TaiError::FileError(format!("无法写入 {:?}: {}", path, e))
+    })?;
+    debug!("已保存 {} 个 provider 配置", providers.len());
+    Ok(())
+}
+
+pub fn update_provider_api_key(provider_name: &str, api_key: &str) -> TaiResult<()> {
+    let mut providers = load_providers()?;
+    let p = providers
+        .iter_mut()
+        .find(|p| p.provider == provider_name)
+        .ok_or_else(|| {
+            TaiError::ConfigError(format!("Provider '{}' 不存在于配置文件中", provider_name))
+        })?;
+    p.api_key = api_key.to_string();
+    debug!("已更新 {} 的 API Key", provider_name);
+    save_providers(&providers)
 }
 
 /// 根据状态文件找到对应的 (ProviderConfig, model_name)。

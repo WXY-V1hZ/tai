@@ -75,7 +75,7 @@ pub fn init_logging() {
         .with_line_number(true)
         .with_file(true);
 
-    // 控制台日志层（只记录 INFO 及以上级别，格式简洁）
+    // 控制台日志层（只记录 INFO 及以上级别，格式简洁，不含时间戳）
     let console_layer = fmt::layer()
         .with_writer(std::io::stderr)
         .with_ansi(true)
@@ -83,6 +83,7 @@ pub fn init_logging() {
         .with_thread_ids(false)
         .with_line_number(false)
         .with_file(false)
+        .without_time()
         .compact();
 
     // 环境变量过滤器，默认控制台 INFO，文件 DEBUG

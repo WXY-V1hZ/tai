@@ -17,6 +17,12 @@ pub enum TaiError {
     #[error("AI 请求错误: {0}")]
     AiError(String),
 
+    #[error("API Key 无效，请重新输入 {0} 的 API Key")]
+    AuthError(String),
+
+    #[error("无法连接到服务器 {0}，请检查 providers.json 中的 base_url 配置")]
+    ConnectionError(String),
+
     #[error("文件操作错误: {0}")]
     FileError(String),
 
